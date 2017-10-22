@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<configuration>
+  <servers>
+    <master fqdn="ns1.example.com" hostname="ns1" ipv4="192.0.2.1" ipv6="2001:db8:0:1::1"/>
+    <slave fqdn="ns2.example.com" hostname="ns2" ipv6="2001:db8:0:2::1"/>
+    <slave fqdn="ns3.example.com" hostname="ns3" ipv4="203.0.113.1"/>
+    <slave fqdn="ns4.example.com" hostname="ns4"/>
+  </servers>
+  <zones>
+    <zone name="example.org">
+      <nsupdate name="laptop" types="A,AAAA"/>
+      <nsupdate name="home-server"/>
+    </zone>
+    <zone name="example.com"/>
+  </zones>
+  <parameters>
+    <email>hostmaster@example.com</email>
+    <ttl>5m</ttl>
+    <refresh>4h</refresh>
+    <retry>1h</retry>
+    <expire>1w</expire>
+    <minimum>3h</minimum>
+  </parameters>
+</configuration>
