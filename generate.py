@@ -289,12 +289,23 @@ find /${CONFIG_DIR}/dnssec-keys -type f -name '*.private' -print0 \
 'chown ${PERMISSIONS["root-user"]}:${PERMISSIONS["bind-group"]} FILES ; chmod ${PERMISSIONS["flags"]} FILES ;'
 
 ''',
+
+# --------------------------------------------------------------------------
+
+"install.sh": '''#!/bin/sh
+echo ${MASTER["fqdn"]}
+% for SLAVE_FQDN in SLAVES:
+echo ${SLAVE_FQDN}
+% endfor
+''',
+
 }
 
 # --------------------------------------------------------------------------
 # you do not need to edit what is below this comment
 # --------------------------------------------------------------------------
 
+import argparse
 import base64
 import logging
 import os
@@ -306,71 +317,73 @@ import tarfile
 
 from mako.template import Template
 
+class Storage:
+
+    def __init__(self, base_dir):
+        self.base_dir = base_dir
+        logging.debug("Ensuring that storage directory '%s' exists" % self.base_dir)
+        os.makedirs(self.base_dir, exist_ok=True)
+
+    def get_base_dir(self):
+        return self.base_dir
+
+    def get_full_path(self, relative_path):
+        return "%s/%s" % (self.base_dir, relative_path)
+
+    def write_file(self, relative_path, content, overwrite):
+        full_path = self.get_full_path(relative_path)
+        directory = os.path.dirname(full_path)
+        os.makedirs(directory, exist_ok=True)
+        if not overwrite and os.path.isfile(full_path):
+            logging.info("File %s exists and overwrite disabled, skipping" % full_path)
+            return
+
+        logging.debug("Saving content to %s" % full_path)
+        with open(full_path, "w") as f:
+            f.write(content)
+
+    def set_permissions(self, relative_path, perms):
+        full_path = self.get_full_path(relative_path)
+        logging.debug("Setting permissions %s to %s" % (perms, full_path))
+        os.chmod(full_path, int(perms, 8))
+
 class Archive:
 
-    def __init__(self, archivename, build_dir):
-        self.build_dir = build_dir
-        os.makedirs(build_dir, exist_ok=True)
-        self.archivename = archivename
-        self.content = {}
-        self.re_key = re.compile("^.*\.key$")
-        self.re_shell = re.compile("^.*\.sh$")
+    def __init__(self, name, storage):
+        self.storage = storage
+        self.name = name
+        self.file_list = {}
 
-    def add(self, filepath, content):
-        self.content[filepath] = content
+    def get_full_path(self, relative_path):
+        return "%s/%s" % (self.name, relative_path)
 
-    def save_file(self, fullpath, content):
-        if self.re_key.match(fullpath) and os.path.isfile(fullpath):
-            logging.warn("File %s exists, not overwriting it" % fullpath)
-        elif re.match("^.*/db\.[^.]+(\.[^.]+)+$", fullpath) and os.path.isfile(fullpath):
-            logging.warn("File %s exists, not overwriting it" % fullpath)
-        else:
-            logging.debug("Saving %s" % fullpath)
-            with open(fullpath, "w") as f:
-                f.write(content)
-        # set permissions
-        if self.re_key.match(fullpath):
-            os.chmod(fullpath,
-                stat.S_IRUSR |
-                stat.S_IWUSR |
-                stat.S_IRGRP |
-                stat.S_IWGRP)
+    def store(self, relative_path, content, perms, overwrite):
+        full_path = self.get_full_path(relative_path)
+        self.file_list[relative_path] = True
+        self.storage.write_file(full_path, content, overwrite)
+        self.storage.set_permissions(full_path, perms)
 
-        # set permissions
-        if self.re_shell.match(fullpath):
-            os.chmod(fullpath,
-                stat.S_IRUSR |
-                stat.S_IWUSR |
-                stat.S_IXUSR |
-                stat.S_IRGRP |
-                stat.S_IWGRP |
-                stat.S_IXGRP |
-                stat.S_IROTH |
-                stat.S_IXOTH)
-
-    def save(self):
-        t = "%s/%s.tar.gz" % (self.build_dir, self.archivename)
-        with tarfile.open(t, "w:gz") as tar:
-            for filepath, content in self.content.items():
-                fullpath = "%s/%s/%s" % (self.build_dir, self.archivename, filepath)
-                directory = os.path.dirname(fullpath)
-                os.makedirs(directory, exist_ok=True)
-                self.save_file(fullpath, content)
-                tar.add(fullpath, arcname=filepath)
-        logging.info("Archive %s ready" % t)
+    def make_tar(self):
+        archive_path = self.storage.get_full_path("%s.tar.gz" % self.name)
+        with tarfile.open(archive_path, "w:gz") as tar:
+            for relative_path in self.file_list:
+                full_path = self.storage.get_full_path(self.get_full_path(relative_path))
+                tar.add(full_path, arcname=relative_path)
+                logging.debug("File %s added to tarball" % full_path)
+            logging.debug("Tarball %s created" % archive_path)
 
 class App:
 
-    def __init__(self, config, templates):
-        self.build_dir = "build"
-        self.config = config
-        self.templates = templates
-        # prepare storage
-        self.storage = {
-            "master-conf": Archive("master-conf", self.build_dir),
-            "master-zones": Archive("master-zones", self.build_dir),
-            "slave-conf": Archive("slave-conf", self.build_dir),
-        }
+    def __init__(self, storage, overwrite):
+        self.storage = storage
+        self.archives = {}
+        self.setup_archive("master-conf")
+        self.setup_archive("master-zones")
+        self.setup_archive("slave-conf")
+        self.overwrite = overwrite
+
+    def setup_archive(self, name):
+        self.archives[name] = Archive(name, self.storage)
 
     @staticmethod
     def get_random_base64(length):
@@ -378,96 +391,112 @@ class App:
         d = bytes([r.randint(0, 255) for i in range(length)])
         return base64.b64encode(d).decode("UTF-8")
 
-    def add(self, target, pathtype, relpath, content):
-        self.storage[target].add(
-            "%s/%s" % (self.config["path"][pathtype], relpath),
-            content)
-
     def get_template(self, name):
         return self.templates[name]
 
-    def save(self):
-        for k, v in self.storage.items():
-            v.save()
+    def save(self, archive, inner_directory, file_name, content, perms="664"):
+        self.archives[archive].store("%s/%s" % (inner_directory, file_name), content, perms, self.overwrite)
 
-    def run(self):
-        t = Template(self.get_template("named.conf"))
+    def run(self, config, templates):
+
+        # named.conf
+        t = Template(templates["named.conf"])
         r = t.render(CONFIG_DIR=config["path"]["config"])
-        self.add("master-conf", "config", "named.conf", r)
-        self.add("slave-conf", "config", "named.conf", r)
+        self.save("master-conf", config["path"]["config"], "named.conf", r)
+        self.save("slave-conf", config["path"]["config"], "named.conf", r)
         # named.conf.options
-        t = Template(self.get_template("named.conf.options"))
+        t = Template(templates["named.conf.options"])
         r = t.render(DATA_DIR=config["path"]["data"])
-        self.add("master-conf", "config", "named.conf.options", r)
-        self.add("slave-conf", "config", "named.conf.options", r)
+        self.save("master-conf", config["path"]["config"], "named.conf.options", r)
+        self.save("slave-conf", config["path"]["config"], "named.conf.options", r)
         # named.conf.options
-        t = Template(self.get_template("key"))
+        t = Template(templates["key"])
         r = t.render(
             KEY_NAME="master-slave",
             KEY_ALGO="hmac-sha256",
             KEY_SECRET=self.get_random_base64(32))
-        self.add("master-conf", "config", "auth-master-slave.key", r)
-        self.add("slave-conf", "config", "auth-master-slave.key", r)
+        self.save("master-conf", config["path"]["config"], "auth-master-slave.key", r, "640")
+        self.save("slave-conf", config["path"]["config"], "auth-master-slave.key", r, "640")
         # named.conf.local.master
-        t = Template(self.get_template("named.conf.local.master"))
+        t = Template(templates["named.conf.local.master"])
         r = t.render(
             CONFIG_DIR=config["path"]["config"],
             DATA_DIR=config["path"]["data"],
             SLAVES=config["slaves"],
             ZONES=config["zones"])
-        self.add("master-conf", "config", "named.conf.local", r)
+        self.save("master-conf", config["path"]["config"], "named.conf.local", r)
         # named.conf.local.slave
-        t = Template(self.get_template("named.conf.local.slave"))
+        t = Template(templates["named.conf.local.slave"])
         r = t.render(
             CONFIG_DIR=config["path"]["config"],
             DATA_DIR=config["path"]["data"],
             MASTER=config["master"],
             ZONES=config["zones"])
-        self.add("slave-conf", "config", "named.conf.local", r)
+        self.save("slave-conf", config["path"]["config"], "named.conf.local", r)
+
         # permission script
-        t = Template(self.get_template("secure_permissions.sh"))
+        t = Template(templates["secure_permissions.sh"])
         r = t.render(
             CONFIG_DIR=config["path"]["config"],
             DATA_DIR=config["path"]["data"],
             PERMISSIONS=config["secured_permissions"],
             ZONES=config["zones"])
-        self.add("master-conf", "config", "secure_permissions.sh", r)
-        self.add("slave-conf", "config", "secure_permissions.sh", r)
+        self.save("master-conf", config["path"]["config"], "secure_permissions.sh", r)
+        self.save("slave-conf", config["path"]["config"], "secure_permissions.sh", r)
         # dnssec-key script
-        t = Template(self.get_template("ensure_dnssec_keys.sh"))
+        t = Template(templates["ensure_dnssec_keys.sh"])
         r = t.render(
             CONFIG_DIR=config["path"]["config"],
             PERMISSIONS=config["secured_permissions"],
             ZONES=config["zones"])
-        self.add("master-conf", "config", "ensure_dnssec_keys.sh", r)
+        self.save("master-conf", config["path"]["config"], "ensure_dnssec_keys.sh", r)
+
         # per zone stuff
         for zone_name, zone_data in config["zones"].items():
+
             # zone file
-            t = Template(self.get_template("zone_file"))
+            t = Template(templates["zone_file"])
             r = t.render(
-                PARAMETERS=self.config["parameters"],
+                PARAMETERS=config["parameters"],
                 MASTER=config["master"],
                 SLAVES=config["slaves"],
                 ZONE_NAME=zone_name)
-            self.add("master-zones", "data", "db.%s" % zone_name, r)
+            self.save("master-zones", config["path"]["data"], "db.%s" % zone_name, r)
+
             # nsupdate keys
             try:
                 nsupdate = zone_data["dynamic-updates"]
-                for rr_name in nsupdate:
-                    t = Template(self.get_template("key"))
-                    r = t.render(
-                        KEY_NAME="%s.%s" % (rr_name, zone_name),
-                        KEY_ALGO="hmac-sha256",
-                        KEY_SECRET=self.get_random_base64(32))
-
-                    f = "nsupdate-keys/%s/%s.%s.key" % (zone_name, rr_name, zone_name)
-                    self.add("master-conf", "config", f, r)
             except KeyError:
-                pass
-        # generate archives
-        self.save()
+                nsupdate = {}
+            for rr_name in nsupdate:
+                t = Template(templates["key"])
+                r = t.render(
+                    KEY_NAME="%s.%s" % (rr_name, zone_name),
+                    KEY_ALGO="hmac-sha256",
+                    KEY_SECRET=self.get_random_base64(32))
+                f = "nsupdate-keys/%s/%s.%s.key" % (zone_name, rr_name, zone_name)
+                self.save("master-conf", config["path"]["config"], f, r, "640")
+
+        # generate install script
+        t = Template(templates["install.sh"])
+        r = t.render(MASTER=config["master"], SLAVES=config["slaves"])
+        self.storage.write_file("install.sh", r, self.overwrite)
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.INFO)
-    app = App(config, templates)
-    app.run()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--destination", metavar="DEST", default="build")
+    parser.add_argument("-f", "--force", action="store_true")
+    parser.add_argument("-l", "--log-level", metavar="LVL", choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"], default="WARNING")
+    args = parser.parse_args()
+
+    numeric_level = getattr(logging, args.log_level)
+    logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=numeric_level)
+    logging.debug("Command line arguments: %s" % args)
+
+    if args.force:
+        logging.info("Forced mode activated, keys will be overwritten")
+
+    storage = Storage(args.destination)
+    app = App(storage, args.force)
+    app.run(config, templates)
