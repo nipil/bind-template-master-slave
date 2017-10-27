@@ -235,13 +235,50 @@ ${SLAVE_FQDN}. AAAA ${SLAVE_ADDRESSES["ipv6"]}
 
 "secure_permissions.sh": '''#!/bin/sh
 
+find /${CONFIG_DIR} -type f -print0 \
+| xargs -0 -I FILES sh -c \
+'chown ${PERMISSIONS["owner"]}:${PERMISSIONS["group"]} FILES ;'
+
 find /${CONFIG_DIR} -maxdepth 1 -type f -name '*.key' -print0 \
 | xargs -0 -I FILES sh -c \
 'chown ${PERMISSIONS["owner"]}:${PERMISSIONS["group"]} FILES ; chmod ${PERMISSIONS["flags"]} FILES ;'
 
+find /${DATA_DIR} -type f -print0 \
+| xargs -0 -I FILES sh -c \
+'chown ${PERMISSIONS["owner"]}:${PERMISSIONS["group"]} FILES ;'
+''',
+
+# --------------------------------------------------------------------------
+
+"ensure_dnssec_keys.sh": '''#!/bin/sh
+
+% for ZONE_NAME, ZONE_DATA in ZONES.items():
+TARGET=/${CONFIG_DIR}/dnssec-keys/${ZONE_NAME}
+
+mkdir -p $TARGET
+
+find $TARGET -type f -name 'K*.key' -print0 \
+    | xargs -0 grep "key-signing key" > /dev/null
+
+[ $? -eq 0 ] || {
+    echo "Missing key-signing key for ${ZONE_NAME}" ;
+    dnssec-keygen -K $TARGET -f ksk ${ZONE_NAME} ;
+}
+
+find $TARGET -type f -name 'K*.key' -print0 \
+    | xargs -0 grep "zone-signing key" > /dev/null
+
+[ $? -eq 0 ] || {
+    echo "Missing zone signing key for ${ZONE_NAME}" ;
+    dnssec-keygen -K $TARGET ${ZONE_NAME} ;
+}
+
+%endfor
+
 find /${CONFIG_DIR}/dnssec-keys -type f -name '*.private' -print0 \
 | xargs -0 -I FILES sh -c \
 'chown ${PERMISSIONS["owner"]}:${PERMISSIONS["group"]} FILES ; chmod ${PERMISSIONS["flags"]} FILES ;'
+
 ''',
 }
 
@@ -382,9 +419,17 @@ class App:
         t = Template(self.get_template("secure_permissions.sh"))
         r = t.render(
             CONFIG_DIR=config["path"]["config"],
+            DATA_DIR=config["path"]["data"],
             PERMISSIONS=config["secured_permissions"],
             ZONES=config["zones"])
         self.add_all("config", "secure_permissions.sh", r)
+        # dnssec-key script
+        t = Template(self.get_template("ensure_dnssec_keys.sh"))
+        r = t.render(
+            CONFIG_DIR=config["path"]["config"],
+            PERMISSIONS=config["secured_permissions"],
+            ZONES=config["zones"])
+        self.add("master", "config", "ensure_dnssec_keys.sh", r)
         # per zone stuff
         for zone_name, zone_data in config["zones"].items():
             # zone file
