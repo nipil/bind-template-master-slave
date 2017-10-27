@@ -219,7 +219,7 @@ import re
 %>
 $ORIGIN .
 $TTL ${PARAMETERS["ttl"]}
-${ZONE_NAME} IN SOA ${MASTER["fqdn"]}. ${PARAMETERS["email"]}. (
+${ZONE_NAME} IN SOA ${MASTER["fqdn"]}. ${PARAMETERS["email"].replace("@",".")}. (
     0 ; serial
     ${PARAMETERS["refresh"]} ; refresh
     ${PARAMETERS["retry"]} ; retry
