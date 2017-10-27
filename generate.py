@@ -11,8 +11,9 @@ config = {
         "data": "var/cache/bind",
     },
     "secured_permissions": {
-        "owner": "root",
-        "group": "bind",
+        "root-user": "root",
+        "bind-user": "bind",
+        "bind-group": "bind",
         "flags": "640",
     },
     "master": {
@@ -245,15 +246,15 @@ ${SLAVE_FQDN}. AAAA ${SLAVE_ADDRESSES["ipv6"]}
 
 find /${CONFIG_DIR} -type f -print0 \
 | xargs -0 -I FILES sh -c \
-'chown ${PERMISSIONS["owner"]}:${PERMISSIONS["group"]} FILES ;'
+'chown ${PERMISSIONS["root-user"]}:${PERMISSIONS["bind-group"]} FILES ;'
 
 find /${CONFIG_DIR} -maxdepth 1 -type f -name '*.key' -print0 \
 | xargs -0 -I FILES sh -c \
-'chown ${PERMISSIONS["owner"]}:${PERMISSIONS["group"]} FILES ; chmod ${PERMISSIONS["flags"]} FILES ;'
+'chmod ${PERMISSIONS["flags"]} FILES ;'
 
 find /${DATA_DIR} -type f -print0 \
 | xargs -0 -I FILES sh -c \
-'chown ${PERMISSIONS["owner"]}:${PERMISSIONS["group"]} FILES ;'
+'chown ${PERMISSIONS["bind-user"]}:${PERMISSIONS["bind-group"]} FILES ;'
 ''',
 
 # --------------------------------------------------------------------------
@@ -285,7 +286,7 @@ find $TARGET -type f -name 'K*.key' -print0 \
 
 find /${CONFIG_DIR}/dnssec-keys -type f -name '*.private' -print0 \
 | xargs -0 -I FILES sh -c \
-'chown ${PERMISSIONS["owner"]}:${PERMISSIONS["group"]} FILES ; chmod ${PERMISSIONS["flags"]} FILES ;'
+'chown ${PERMISSIONS["root-user"]}:${PERMISSIONS["bind-group"]} FILES ; chmod ${PERMISSIONS["flags"]} FILES ;'
 
 ''',
 }
