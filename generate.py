@@ -6,6 +6,7 @@
 
 config = {
     "path": {
+        # do NOT add any leading /
         "config": "etc/bind",
         "data": "var/cache/bind",
     },
@@ -63,9 +64,9 @@ templates = {
 //
 // If you are just adding zones, please do that in ${CONFIG_DIR}/named.conf.local
 
-include "${CONFIG_DIR}/named.conf.options";
-include "${CONFIG_DIR}/named.conf.local";
-include "${CONFIG_DIR}/named.conf.default-zones";
+include "/${CONFIG_DIR}/named.conf.options";
+include "/${CONFIG_DIR}/named.conf.local";
+include "/${CONFIG_DIR}/named.conf.default-zones";
 ''',
 
 # --------------------------------------------------------------------------
@@ -73,7 +74,7 @@ include "${CONFIG_DIR}/named.conf.default-zones";
 "named.conf.options": '''
 
 options {
-    directory "${DATA_DIR}/bind";
+    directory "/${DATA_DIR}";
 
     // If there is a firewall between you and nameservers you want
     // to talk to, you may need to fix the firewall to allow multiple
@@ -123,7 +124,7 @@ key "${KEY_NAME}" {
 // --------------------------------------------------------------------------
 
 // auth key for master-slave communications
-include "${CONFIG_DIR}/auth-master-slave.key";
+include "/${CONFIG_DIR}/auth-master-slave.key";
 
 % for SLAVE_FQDN, SLAVE_ADDRESSES in SLAVES.items():
 // authenticate communications with ${SLAVE_FQDN}
@@ -143,16 +144,16 @@ server ${SLAVE_ADDRESSES["ipv6"]} {
 % if len(get_dynamic_updates(ZONE_DATA)) > 0:
 // nsupdate keys for ${ZONE_NAME}
     % for RR_NAME, RR_TYPES in get_dynamic_updates(ZONE_DATA).items():
-include "${CONFIG_DIR}/nsupdate-keys/${ZONE_NAME}/${RR_NAME}.${ZONE_NAME}.key";
+include "/${CONFIG_DIR}/nsupdate-keys/${ZONE_NAME}/${RR_NAME}.${ZONE_NAME}.key";
     %endfor
 
 % endif
 zone "${ZONE_NAME}" {
     type master;
-    file "${DATA_DIR}/db.${ZONE_NAME}";
+    file "/${DATA_DIR}/db.${ZONE_NAME}";
     allow-transfer { key master-slave ; };
 
-    key-directory "${CONFIG_DIR}/dnssec-keys/${ZONE_NAME}";
+    key-directory "/${CONFIG_DIR}/dnssec-keys/${ZONE_NAME}";
     inline-signing yes;
     auto-dnssec maintain;
     % if len(get_dynamic_updates(ZONE_DATA)) > 0:
@@ -181,7 +182,7 @@ zone "${ZONE_NAME}" {
 // --------------------------------------------------------------------------
 
 // auth key for master-slave communications
-include "${CONFIG_DIR}/auth-master-slave.key";
+include "/${CONFIG_DIR}/auth-master-slave.key";
 
 // authenticate communications with ${MASTER["fqdn"]}
 server ${MASTER["ipv4"]} {
@@ -199,7 +200,7 @@ server ${MASTER["ipv6"]} {
 zone "${ZONE_NAME}" {
 
     type slave;
-    file "${DATA_DIR}/db.${ZONE_NAME}";
+    file "/${DATA_DIR}/db.${ZONE_NAME}";
     masters {
         ${MASTER["ipv4"]};
         ${MASTER["ipv6"]};
