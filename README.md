@@ -4,6 +4,8 @@ A MAKO template for quick generation of master/slave Bind9 configurations
 
 Note, this template is modular and follows the Debian/Ubuntu file organisation
 
+It is mostly useful for initialization (as zone files are pushed and will overwrite existing ones)
+
 # Setup
 
 On your management environment :
@@ -16,11 +18,22 @@ On your management environment :
 
 # Use
 
-Edit config.py to fit your needs
+Edit the first part of `generate.py` to fit your needs
 
 Run :
 
     . venv/bin/activate
     ./generate.py
 
-Then install generated files to your servers
+For each slave dns server :
+
+- push `build/slave.tar` to the host
+- install it : `tar xfv /root/slave.tar.gz -C /`
+- reload configuration : `rndc reconfig`
+
+On your master server :
+
+- push `build/master.tar` to the host
+- stop bind : `systemctl stop bind9`
+- install config and zone data `tar xfv /root/master.tar.gz -C /`
+- start bind : `systemctl start bind9`
