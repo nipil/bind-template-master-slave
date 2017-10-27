@@ -367,8 +367,9 @@ class App:
         self.templates = templates
         # prepare storage
         self.storage = {
-            "master": Archive("master", self.build_dir),
-            "slave": Archive("slave", self.build_dir),
+            "master-conf": Archive("master-conf", self.build_dir),
+            "master-zones": Archive("master-zones", self.build_dir),
+            "slave-conf": Archive("slave-conf", self.build_dir),
         }
 
     @staticmethod
@@ -382,10 +383,6 @@ class App:
             "%s/%s" % (self.config["path"][pathtype], relpath),
             content)
 
-    def add_all(self, pathtype, relpath, content):
-        for k in self.storage:
-            self.add(k, pathtype, relpath, content)
-
     def get_template(self, name):
         return self.templates[name]
 
@@ -396,18 +393,21 @@ class App:
     def run(self):
         t = Template(self.get_template("named.conf"))
         r = t.render(CONFIG_DIR=config["path"]["config"])
-        self.add_all("config", "named.conf", r)
+        self.add("master-conf", "config", "named.conf", r)
+        self.add("slave-conf", "config", "named.conf", r)
         # named.conf.options
         t = Template(self.get_template("named.conf.options"))
         r = t.render(DATA_DIR=config["path"]["data"])
-        self.add_all("config", "named.conf.options", r)
+        self.add("master-conf", "config", "named.conf.options", r)
+        self.add("slave-conf", "config", "named.conf.options", r)
         # named.conf.options
         t = Template(self.get_template("key"))
         r = t.render(
             KEY_NAME="master-slave",
             KEY_ALGO="hmac-sha256",
             KEY_SECRET=self.get_random_base64(32))
-        self.add_all("config", "auth-master-slave.key", r)
+        self.add("master-conf", "config", "auth-master-slave.key", r)
+        self.add("slave-conf", "config", "auth-master-slave.key", r)
         # named.conf.local.master
         t = Template(self.get_template("named.conf.local.master"))
         r = t.render(
@@ -415,7 +415,7 @@ class App:
             DATA_DIR=config["path"]["data"],
             SLAVES=config["slaves"],
             ZONES=config["zones"])
-        self.add("master", "config", "named.conf.local", r)
+        self.add("master-conf", "config", "named.conf.local", r)
         # named.conf.local.slave
         t = Template(self.get_template("named.conf.local.slave"))
         r = t.render(
@@ -423,7 +423,7 @@ class App:
             DATA_DIR=config["path"]["data"],
             MASTER=config["master"],
             ZONES=config["zones"])
-        self.add("slave", "config", "named.conf.local", r)
+        self.add("slave-conf", "config", "named.conf.local", r)
         # permission script
         t = Template(self.get_template("secure_permissions.sh"))
         r = t.render(
@@ -431,14 +431,15 @@ class App:
             DATA_DIR=config["path"]["data"],
             PERMISSIONS=config["secured_permissions"],
             ZONES=config["zones"])
-        self.add_all("config", "secure_permissions.sh", r)
+        self.add("master-conf", "config", "secure_permissions.sh", r)
+        self.add("slave-conf", "config", "secure_permissions.sh", r)
         # dnssec-key script
         t = Template(self.get_template("ensure_dnssec_keys.sh"))
         r = t.render(
             CONFIG_DIR=config["path"]["config"],
             PERMISSIONS=config["secured_permissions"],
             ZONES=config["zones"])
-        self.add("master", "config", "ensure_dnssec_keys.sh", r)
+        self.add("master-conf", "config", "ensure_dnssec_keys.sh", r)
         # per zone stuff
         for zone_name, zone_data in config["zones"].items():
             # zone file
@@ -448,7 +449,7 @@ class App:
                 MASTER=config["master"],
                 SLAVES=config["slaves"],
                 ZONE_NAME=zone_name)
-            self.add("master", "data", "db.%s" % zone_name, r)
+            self.add("master-zones", "data", "db.%s" % zone_name, r)
             # nsupdate keys
             try:
                 nsupdate = zone_data["dynamic-updates"]
@@ -458,8 +459,9 @@ class App:
                         KEY_NAME="%s.%s" % (rr_name, zone_name),
                         KEY_ALGO="hmac-sha256",
                         KEY_SECRET=self.get_random_base64(32))
+
                     f = "nsupdate-keys/%s/%s.%s.key" % (zone_name, rr_name, zone_name)
-                    self.add("master", "config", f, r)
+                    self.add("master-conf", "config", f, r)
             except KeyError:
                 pass
         # generate archives
