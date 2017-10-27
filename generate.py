@@ -275,6 +275,8 @@ class Archive:
     def save_resource(self, fullpath, content):
         if self.re_key.match(fullpath) and os.path.isfile(fullpath):
             logging.info("Keeping %s" % fullpath)
+        elif re.match("^.*/db\.[^.]+(\.[^.]+)+$", fullpath) and os.path.isfile(fullpath):
+            logging.info("Keeping %s" % fullpath)
         else:
             logging.debug("Saving %s" % fullpath)
             with open(fullpath, "w") as f:
@@ -401,7 +403,6 @@ class App:
                     self.add("master", "config", f, r)
             except KeyError:
                 pass
-# TODO: check for obsolete elements
         # generate archives
         self.save()
 
