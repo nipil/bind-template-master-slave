@@ -264,6 +264,7 @@ class Archive:
 
     def __init__(self, archivename, build_dir):
         self.build_dir = build_dir
+        os.makedirs(build_dir, exist_ok=True)
         self.archivename = archivename
         self.content = {}
         self.re_key = re.compile("^.*\.key$")
@@ -272,11 +273,11 @@ class Archive:
     def add(self, filepath, content):
         self.content[filepath] = content
 
-    def save_resource(self, fullpath, content):
+    def save_file(self, fullpath, content):
         if self.re_key.match(fullpath) and os.path.isfile(fullpath):
-            logging.info("Keeping %s" % fullpath)
+            logging.warn("File %s exists, not overwriting it" % fullpath)
         elif re.match("^.*/db\.[^.]+(\.[^.]+)+$", fullpath) and os.path.isfile(fullpath):
-            logging.info("Keeping %s" % fullpath)
+            logging.warn("File %s exists, not overwriting it" % fullpath)
         else:
             logging.debug("Saving %s" % fullpath)
             with open(fullpath, "w") as f:
@@ -302,11 +303,15 @@ class Archive:
                 stat.S_IXOTH)
 
     def save(self):
-        for filepath, content in self.content.items():
-            fullpath = "%s/%s/%s" % (self.build_dir, self.archivename, filepath)
-            directory = os.path.dirname(fullpath)
-            os.makedirs(directory, exist_ok=True)
-            self.save_resource(fullpath, content)
+        t = "%s/%s.tar.gz" % (self.build_dir, self.archivename)
+        with tarfile.open(t, "w:gz") as tar:
+            for filepath, content in self.content.items():
+                fullpath = "%s/%s/%s" % (self.build_dir, self.archivename, filepath)
+                directory = os.path.dirname(fullpath)
+                os.makedirs(directory, exist_ok=True)
+                self.save_file(fullpath, content)
+                tar.add(fullpath, arcname=filepath)
+        logging.info("Archive %s ready" % t)
 
 class App:
 
