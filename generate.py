@@ -213,6 +213,9 @@ zone "${ZONE_NAME}" {
 # --------------------------------------------------------------------------
 
 "zone_file": '''
+<%
+import re
+%>
 $ORIGIN .
 $TTL ${PARAMETERS["ttl"]}
 ${ZONE_NAME} IN SOA ${MASTER["fqdn"]}. ${PARAMETERS["email"]}. (
@@ -223,12 +226,16 @@ ${ZONE_NAME} IN SOA ${MASTER["fqdn"]}. ${PARAMETERS["email"]}. (
     ${PARAMETERS["minimum"]} ; minimum
     )
     NS ${MASTER["fqdn"]}.
+% if re.match('^.*\.%s$' % ZONE_NAME, MASTER["fqdn"]):
 ${MASTER["fqdn"]}. A ${MASTER["ipv4"]}
 ${MASTER["fqdn"]}. AAAA ${MASTER["ipv6"]}
+% endif
 % for SLAVE_FQDN, SLAVE_ADDRESSES in SLAVES.items():
     NS ${SLAVE_FQDN}.
+    % if re.match('^.*\.%s$' % ZONE_NAME, SLAVE_FQDN):
 ${SLAVE_FQDN}. A ${SLAVE_ADDRESSES["ipv4"]}
 ${SLAVE_FQDN}. AAAA ${SLAVE_ADDRESSES["ipv6"]}
+    % endif
 % endfor
 ''',
 
