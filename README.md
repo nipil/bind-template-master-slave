@@ -39,6 +39,7 @@ For each slave dns server :
 
 - push `build/slave-conf.tar.gz` to the host
 - install it : `tar xfv slave-conf.tar.gz -C /`
+- fix permissions : `${CONF_DIR}/secure_permissions.sh`
 - reload configuration : `rndc reconfig`
 
 On your master server :
@@ -47,4 +48,6 @@ On your master server :
 - stop bind : `systemctl stop bind9`
 - install config `tar xfv master-conf.tar.gz -C /`
 - install zones files (without overwriting existing ones, for example) `tar xfv master-conf.tar.gz -C / --keep-old-files`
+- fix permissions : `${CONF_DIR}/secure_permissions.sh`
+- ensure DNSSEC keys are setup : `${CONF_DIR}/ensure_dnssec_keys.sh`
 - start bind : `systemctl start bind9`
