@@ -25,15 +25,26 @@ Run :
     . venv/bin/activate
     ./generate.py
 
+Options:
+
+    -l level : specify logging level (default=warning)
+    -c config.py : use specified configuration files
+    -d destination : folder where all the generated files will be placed
+    -t templates : folder where the templates are located
+    -f : overwrite key files and zone files
+
+# Install
+
 For each slave dns server :
 
-- push `build/slave.tar` to the host
-- install it : `tar xfv /root/slave.tar.gz -C /`
+- push `build/slave-conf.tar.gz` to the host
+- install it : `tar xfv slave-conf.tar.gz -C /`
 - reload configuration : `rndc reconfig`
 
 On your master server :
 
-- push `build/master.tar` to the host
+- push `build/master-conf.tar.gz` and `build/master-zones.tar.gz` to the host
 - stop bind : `systemctl stop bind9`
-- install config and zone data `tar xfv /root/master.tar.gz -C /`
+- install config `tar xfv master-conf.tar.gz -C /`
+- install zones files (without overwriting existing ones, for example) `tar xfv master-conf.tar.gz -C / --keep-old-files`
 - start bind : `systemctl start bind9`
