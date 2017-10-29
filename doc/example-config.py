@@ -7,7 +7,8 @@ config = {
         "root-user": "root",
         "bind-user": "bind",
         "bind-group": "bind",
-        "flags": "640",
+        "secured_flags": "640",
+        "standard_flags": "664",
     },
     "master": {
         "fqdn": "ns1.example.com",

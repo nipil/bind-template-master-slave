@@ -25,4 +25,4 @@ find $TARGET -type f -name 'K*.key' -print0 \
 
 find ${config.path.config}/dnssec-keys -type f -name '*.private' -print0 \
 | xargs -0 -I FILES sh -c \
-'chown ${config.secured_permissions.root_user}:${config.secured_permissions.bind_group} FILES ; chmod ${config.secured_permissions.flags} FILES ;'
+'chown ${config.secured_permissions.root_user}:${config.secured_permissions.bind_group} FILES ; chmod ${config.secured_permissions.secured_flags} FILES ;'
