@@ -51,3 +51,11 @@ On your master server :
 - fix permissions : `${CONF_DIR}/secure_permissions.sh`
 - ensure DNSSEC keys are setup : `${CONF_DIR}/ensure_dnssec_keys.sh`
 - start bind : `systemctl start bind9`
+
+# Install script
+
+The tool generates an remote install script `build/install.sh`
+
+This script requires a valid ssh configuration for each master/slave fqdn, with a user which can run all commands (root)
+
+It uploads the files via SCP and runs the commands remotely
