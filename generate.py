@@ -326,10 +326,60 @@ class Archive:
 
 class Configuration:
 
+    class Path:
+        def __init__(self, struct):
+            self.config = struct["config"]
+            self.data = struct["data"]
+
+    class Master:
+        def __init__(self, struct):
+            self.fqdn = struct["fqdn"]
+            self.ipv4 = struct["ipv4"]
+            self.ipv6 = struct["ipv6"]
+
+    class Parameters:
+        def __init__(self, struct):
+            self.email = struct["email"]
+            self.ttl = struct["ttl"]
+            self.refresh = struct["refresh"]
+            self.refresh = struct["refresh"]
+            self.expire = struct["expire"]
+            self.minimum = struct["minimum"]
+
+    class SecuredPermissions:
+        def __init__(self, struct):
+            self.root_user = struct["root-user"]
+            self.bind_user = struct["bind-user"]
+            self.bind_group = struct["bind-user"]
+            self.flags = struct["flags"]
+
+    class Slave:
+        def __init__(self, fqdn, struct):
+            self.fqdn = fqdn
+            self.ipv4 = struct["ipv4"]
+            self.ipv6 = struct["ipv6"]
+
+    class Zone:
+        def __init__(self, name, struct):
+            self.name = name
+            self.dynamic_updates = {}
+            try:
+                self.dynamic_updates = {
+                    k: Configuration.DynamicUpdate(k, v) for k, v in struct["dynamic-updates"].items()
+                }
+            except KeyError as e:
+                pass
+
+    class DynamicUpdate:
+        def __init__(self, name, rr_type):
+            self.name = name
+            self.rr_type = rr_type
+
     def __init__(self, relative_path):
         self.load(relative_path)
 
     def load(self, relative_path):
+        # load from file
         logging.info("Loading configuration file %s" % relative_path)
         directory_name = os.path.dirname(relative_path)
         if len(directory_name) > 0:
@@ -339,7 +389,20 @@ class Configuration:
         module_name = os.path.splitext(file_name)[0]
         logging.debug("Loading module %s from file %s located in %s" % (module_name, file_name, directory_name))
         module = importlib.import_module(module_name)
-        self.config = module.config
+
+        self.config = module.config # TODO: remove
+
+        # parse and store elements
+        self.path = Configuration.Path(module.config["path"])
+        self.master = Configuration.Master(module.config["master"])
+        self.parameters = Configuration.Parameters(module.config["parameters"])
+        self.secured_permissions = Configuration.SecuredPermissions(module.config["secured_permissions"])
+        self.slaves = {
+            k: Configuration.Slave(k, v) for k, v in module.config["slaves"].items()
+        }
+        self.zones = {
+            k: Configuration.Zone(k, v) for k, v in module.config["zones"].items()
+        }
 
     def get_config_path(self):
         return self.config["path"]["config"]
@@ -386,71 +449,76 @@ class App:
 
     def run(self, config, templates):
 
-        # named.conf
+        logging.debug("Rendering %s" % "")
         t = mako.template.Template(templates["named.conf"])
-        r = t.render(CONFIG_DIR=config.get_config_path())
-        self.save("master-conf", config.get_config_path(), "named.conf", r)
-        self.save("slave-conf", config.get_config_path(), "named.conf", r)
-        # named.conf.options
+        r = t.render(CONFIG_DIR=config.path.config)
+        self.save("master-conf", config.path.config, "named.conf", r)
+        self.save("slave-conf", config.path.config, "named.conf", r)
+
+        logging.debug("Rendering %s" % "named.conf.options")
         t = mako.template.Template(templates["named.conf.options"])
-        r = t.render(DATA_DIR=config.get_data_path())
-        self.save("master-conf", config.get_config_path(), "named.conf.options", r)
-        self.save("slave-conf", config.get_config_path(), "named.conf.options", r)
-        # named.conf.options
+        r = t.render(DATA_DIR=config.path.data)
+        self.save("master-conf", config.path.config, "named.conf.options", r)
+        self.save("slave-conf", config.path.config, "named.conf.options", r)
+
+        logging.debug("Rendering (auth) key %s" % "auth-master-slave.key")
         t = mako.template.Template(templates["key"])
         r = t.render(
             KEY_NAME="master-slave",
             KEY_ALGO="hmac-sha256",
             KEY_SECRET=self.get_random_base64(32))
-        self.save("master-conf", config.get_config_path(), "auth-master-slave.key", r, "640")
-        self.save("slave-conf", config.get_config_path(), "auth-master-slave.key", r, "640")
-        # named.conf.local.master
+        self.save("master-conf", config.path.config, "auth-master-slave.key", r, "640")
+        self.save("slave-conf", config.path.config, "auth-master-slave.key", r, "640")
+
+        logging.debug("Rendering %s" % "named.conf.local.master")
         t = mako.template.Template(templates["named.conf.local.master"])
         r = t.render(
-            CONFIG_DIR=config.get_config_path(),
-            DATA_DIR=config.get_data_path(),
-            SLAVES=config.get_slaves(),
-            ZONES=config.get_zones())
-        self.save("master-conf", config.get_config_path(), "named.conf.local", r)
-        # named.conf.local.slave
+            CONFIG_DIR=config.path.config,
+            DATA_DIR=config.path.data,
+            SLAVES=config.slaves,
+            ZONES=config.zones)
+        self.save("master-conf", config.path.config, "named.conf.local", r)
+
+        logging.debug("Rendering %s" % "named.conf.local.slave")
         t = mako.template.Template(templates["named.conf.local.slave"])
         r = t.render(
-            CONFIG_DIR=config.get_config_path(),
-            DATA_DIR=config.get_data_path(),
-            MASTER=config.get_master(),
-            ZONES=config.get_zones())
-        self.save("slave-conf", config.get_config_path(), "named.conf.local", r)
+            CONFIG_DIR=config.path.config,
+            DATA_DIR=config.path.data,
+            MASTER=config.master,
+            ZONES=config.zones)
+        self.save("slave-conf", config.path.config, "named.conf.local", r)
 
-        # permission script
+        logging.debug("Rendering %s" % "secure_permissions.sh")
         t = mako.template.Template(templates["secure_permissions.sh"])
         r = t.render(
-            CONFIG_DIR=config.get_config_path(),
-            DATA_DIR=config.get_data_path(),
-            PERMISSIONS=config.get_secured_permissions(),
-            ZONES=config.get_zones())
-        self.save("master-conf", config.get_config_path(), "secure_permissions.sh", r)
-        self.save("slave-conf", config.get_config_path(), "secure_permissions.sh", r)
-        # dnssec-key script
+            CONFIG_DIR=config.path.config,
+            DATA_DIR=config.path.data,
+            PERMISSIONS=config.secured_permissions,
+            ZONES=config.zones)
+        self.save("master-conf", config.path.config, "secure_permissions.sh", r)
+        self.save("slave-conf", config.path.config, "secure_permissions.sh", r)
+
+        logging.debug("Rendering %s" % "ensure_dnssec_keys.sh")
         t = mako.template.Template(templates["ensure_dnssec_keys.sh"])
         r = t.render(
-            CONFIG_DIR=config.get_config_path(),
-            PERMISSIONS=config.get_secured_permissions(),
-            ZONES=config.get_zones())
-        self.save("master-conf", config.get_config_path(), "ensure_dnssec_keys.sh", r)
+            CONFIG_DIR=config.path.config,
+            PERMISSIONS=config.secured_permissions,
+            ZONES=config.zones)
+        self.save("master-conf", config.path.config, "ensure_dnssec_keys.sh", r)
 
         # per zone stuff
-        for zone_name, zone_data in config.get_zones().items():
+        for zone_name, zone_data in config.zones.items():
 
-            # zone file
+            logging.debug("Rendering %s for %s" % ("zone_file", zone_name))
             t = mako.template.Template(templates["zone_file"])
             r = t.render(
-                PARAMETERS=config.get_parameters(),
-                MASTER=config.get_master(),
-                SLAVES=config.get_slaves(),
+                PARAMETERS=config.parameters,
+                MASTER=config.master,
+                SLAVES=config.slaves,
                 ZONE_NAME=zone_name)
-            self.save("master-zones", config.get_data_path(), "db.%s" % zone_name, r)
+            self.save("master-zones", config.path.data, "db.%s" % zone_name, r)
 
-            # nsupdate keys
+            logging.debug("Rendering (dynamic-update) key %s for %s" % (rr_name, zone_name))
             try:
                 nsupdate = zone_data["dynamic-updates"]
             except KeyError:
@@ -462,11 +530,11 @@ class App:
                     KEY_ALGO="hmac-sha256",
                     KEY_SECRET=self.get_random_base64(32))
                 f = "nsupdate-keys/%s/%s.%s.key" % (zone_name, rr_name, zone_name)
-                self.save("master-conf", config.get_config_path(), f, r, "640")
+                self.save("master-conf", config.path.config, f, r, "640")
 
-        # generate install script
+        logging.debug("Rendering %s" % "")
         t = mako.template.Template(templates["install.sh"])
-        r = t.render(MASTER=config.get_master(), SLAVES=config.get_slaves())
+        r = t.render(MASTER=config.master, SLAVES=config.slaves)
         self.storage.write_file("install.sh", r, self.overwrite)
 
 def main():
