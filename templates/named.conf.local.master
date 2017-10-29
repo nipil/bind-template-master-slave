@@ -1,0 +1,53 @@
+//
+// Do any local configuration here
+//
+
+// --------------------------------------------------------------------------
+// SECURITY
+// --------------------------------------------------------------------------
+
+// auth key for master-slave communications
+include "${config.path.config}/auth-master-slave.key";
+
+% for slave in config.slaves.values():
+// authenticate communications with ${slave.fqdn}
+server ${slave.ipv4} {
+    keys { master-slave ; };
+};
+server ${slave.ipv6} {
+    keys { master-slave ; };
+};
+
+% endfor
+% for zone in config.zones.values():
+// --------------------------------------------------------------------------
+// ${zone.name}
+// --------------------------------------------------------------------------
+
+% if len(zone.dynamic_updates) > 0:
+// nsupdate keys for ${zone.name}
+    % for rr_name, rr_types in zone.dynamic_updates.items():
+include "${config.path.config}/nsupdate-keys/${zone.name}/${rr_name}.${zone.name}.key";
+    %endfor
+% endif
+
+zone "${zone.name}" {
+    type master;
+    file "${config.path.data}/db.${zone.name}";
+    allow-transfer { key master-slave ; };
+
+    key-directory "${config.path.config}/dnssec-keys/${zone.name}";
+    inline-signing yes;
+    auto-dnssec maintain;
+    % if len(zone.dynamic_updates) > 0:
+
+    update-policy {
+        grant local-ddns zonesub any;
+        % for d_u in zone.dynamic_updates.values():
+        grant ${d_u.name}.${zone.name} self ${d_u.name}.${zone.name} ${d_u.types};
+        % endfor
+    };
+    % endif
+};
+
+% endfor

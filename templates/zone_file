@@ -1,0 +1,24 @@
+<%
+import re
+%>
+$ORIGIN ${zone.name}.
+$TTL ${config.parameters.ttl}
+@ IN SOA ${config.master.fqdn}. ${config.parameters.email.replace("@",".")}. (
+    0 ; serial
+    ${config.parameters.refresh} ; refresh
+    ${config.parameters.retry} ; retry
+    ${config.parameters.expire} ; expire
+    ${config.parameters.minimum} ; minimum
+    )
+@ IN NS ${config.master.fqdn}.
+% if re.match('^.*\.%s$' % zone.name, config.master.fqdn):
+${config.master.fqdn}. IN A ${config.master.ipv4}
+${config.master.fqdn}. IN AAAA ${config.master.ipv6}
+% endif
+% for slave in config.slaves.values():
+@ IN NS ${slave.fqdn}.
+    % if re.match('^.*\.%s$' % zone.name, slave.fqdn):
+${slave.fqdn}. IN A ${slave.ipv4}
+${slave.fqdn}. IN AAAA ${slave.ipv6}
+    % endif
+% endfor

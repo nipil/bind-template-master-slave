@@ -1,8 +1,7 @@
 config = {
     "path": {
-        # do NOT add any leading /
-        "config": "etc/bind",
-        "data": "var/cache/bind",
+        "config": "/etc/bind",
+        "data": "/var/cache/bind",
     },
     "secured_permissions": {
         "root-user": "root",

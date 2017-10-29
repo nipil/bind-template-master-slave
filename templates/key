@@ -1,0 +1,4 @@
+key "${key.name}" {
+    algorithm ${key.algo};
+    secret "${key.secret}";
+};

@@ -1,0 +1,35 @@
+//
+// Do any local configuration here
+//
+
+// --------------------------------------------------------------------------
+// SECURITY
+// --------------------------------------------------------------------------
+
+// auth key for master-slave communications
+include "${config.path.config}/auth-master-slave.key";
+
+// authenticate communications with ${config.master.fqdn}
+server ${config.master.ipv4} {
+    keys { master-slave ; };
+};
+server ${config.master.ipv6} {
+    keys { master-slave ; };
+};
+
+% for zone in config.zones.values():
+// --------------------------------------------------------------------------
+// ${zone.name}
+// --------------------------------------------------------------------------
+
+zone "${zone.name}" {
+
+    type slave;
+    file "${config.path.data}/db.${zone.name}";
+    masters {
+        ${config.master.ipv4};
+        ${config.master.ipv6};
+    };
+};
+
+%endfor
