@@ -180,55 +180,65 @@ class App:
 
     def run(self, config):
 
-        logging.debug("Rendering %s" % "named.conf")
-        r = self.get_template("named.conf").render(config=config)
-        self.save("master-conf", config.path.config, "named.conf", r, config.secured_permissions.standard_flags, True)
-        self.save("slave-conf", config.path.config, "named.conf", r, config.secured_permissions.standard_flags, True)
+        file = "named.conf"
+        logging.debug("Rendering %s" % file)
+        r = self.get_template(file).render(config=config)
+        self.save("master-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
+        self.save("slave-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
 
-        logging.debug("Rendering %s" % "named.conf.options")
-        r = self.get_template("named.conf.options").render(config=config)
-        self.save("master-conf", config.path.config, "named.conf.options", r, config.secured_permissions.standard_flags, True)
-        self.save("slave-conf", config.path.config, "named.conf.options", r, config.secured_permissions.standard_flags, True)
+        file = "named.conf.options"
+        logging.debug("Rendering %s" % file)
+        r = self.get_template(file).render(config=config)
+        self.save("master-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
+        self.save("slave-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
 
-        logging.debug("Rendering (auth) key '%s'" % "auth-master-slave.key")
+        file = "auth-master-slave.key"
+        logging.debug("Rendering (auth) key '%s'" % file)
         r = self.get_template("key").render(key=RandomKey("master-slave"))
-        self.save("master-conf", config.path.config, "auth-master-slave.key", r, config.secured_permissions.secured_flags, False)
-        self.save("slave-conf", config.path.config, "auth-master-slave.key", r, config.secured_permissions.secured_flags, False)
+        self.save("master-conf", config.path.config, file, r, config.secured_permissions.secured_flags, False)
+        self.save("slave-conf", config.path.config, file, r, config.secured_permissions.secured_flags, False)
 
-        logging.debug("Rendering %s" % "named.conf.local.master")
-        r = self.get_template("named.conf.local.master").render(config=config)
+        file = "named.conf.local.master"
+        logging.debug("Rendering %s" % file)
+        r = self.get_template(file).render(config=config)
         self.save("master-conf", config.path.config, "named.conf.local", r, config.secured_permissions.standard_flags, True)
 
-        logging.debug("Rendering %s" % "named.conf.local.slave")
-        r = self.get_template("named.conf.local.slave").render(config=config)
+        file = "named.conf.local.slave"
+        logging.debug("Rendering %s" % file)
+        r = self.get_template(file).render(config=config)
         self.save("slave-conf", config.path.config, "named.conf.local", r, config.secured_permissions.standard_flags, True)
 
-        logging.debug("Rendering %s" % "secure_permissions.sh")
-        r = self.get_template("secure_permissions.sh").render(config=config)
-        self.save("master-conf", config.path.config, "secure_permissions.sh", r, config.secured_permissions.standard_flags, True)
-        self.save("slave-conf", config.path.config, "secure_permissions.sh", r, config.secured_permissions.standard_flags, True)
+        file = "secure_permissions.sh"
+        logging.debug("Rendering %s" % file)
+        r = self.get_template(file).render(config=config)
+        self.save("master-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
+        self.save("slave-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
 
-        logging.debug("Rendering %s" % "ensure_dnssec_keys.sh")
-        r = self.get_template("ensure_dnssec_keys.sh").render(config=config)
-        self.save("master-conf", config.path.config, "ensure_dnssec_keys.sh", r, config.secured_permissions.standard_flags, True)
+        file = "ensure_dnssec_keys.sh"
+        logging.debug("Rendering %s" % file)
+        r = self.get_template(file).render(config=config)
+        self.save("master-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
 
         for zone in config.zones.values():
 
-            logging.debug("Rendering %s for %s" % ("zone_file", zone.name))
-            r = self.get_template("zone_file").render(config=config, zone=zone)
+            file = "zone_file"
+            logging.debug("Rendering %s for %s" % (file, zone.name))
+            r = self.get_template(file).render(config=config, zone=zone)
             self.save("master-zones", config.path.data, "db.%s" % zone.name, r, config.secured_permissions.standard_flags, False)
 
             for d_u in zone.dynamic_updates.values():
-                logging.debug("Rendering (dynamic-update) key '%s' for zone %s" % (d_u.name, zone.name))
-                n = "%s.%s" % (d_u.name, zone.name)
-                r = self.get_template("key").render(key=RandomKey(n))
-                f = "nsupdate-keys/%s/%s.%s.key" % (zone.name, d_u.name, zone.name)
-                self.save("master-conf", config.path.config, f, r, config.secured_permissions.secured_flags, False)
 
-        logging.debug("Rendering %s" % "install.sh")
-        r = self.get_template("install.sh").render(config=config)
-        self.storage.write_file("install.sh", r, True)
-        self.storage.set_permissions("install.sh", config.secured_permissions.standard_flags)
+                n = "%s.%s" % (d_u.name, zone.name)
+                file = "nsupdate-keys/%s/%s.key" % (zone.name, n)
+                logging.debug("Rendering (dynamic-update) key %s" % n)
+                r = self.get_template("key").render(key=RandomKey(n))
+                self.save("master-conf", config.path.config, file, r, config.secured_permissions.secured_flags, False)
+
+        file = "install.sh"
+        logging.debug("Rendering %s" % file)
+        r = self.get_template(file).render(config=config)
+        self.storage.write_file(file, r, True)
+        self.storage.set_permissions(file, config.secured_permissions.standard_flags)
 
 if __name__ == '__main__':
     try:
