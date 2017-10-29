@@ -98,6 +98,7 @@ class Configuration:
             self.bind_group = struct["bind-user"]
             self.secured_flags = struct["secured_flags"]
             self.standard_flags = struct["standard_flags"]
+            self.shell_flags = struct["shell_flags"]
 
     class Slave:
         def __init__(self, fqdn, struct):
@@ -211,13 +212,13 @@ class App:
         file = "secure_permissions.sh"
         logging.debug("Rendering %s" % file)
         r = self.get_template(file).render(config=config)
-        self.save("master-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
-        self.save("slave-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
+        self.save("master-conf", config.path.config, file, r, config.secured_permissions.shell_flags, True)
+        self.save("slave-conf", config.path.config, file, r, config.secured_permissions.shell_flags, True)
 
         file = "ensure_dnssec_keys.sh"
         logging.debug("Rendering %s" % file)
         r = self.get_template(file).render(config=config)
-        self.save("master-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
+        self.save("master-conf", config.path.config, file, r, config.secured_permissions.shell_flags, True)
 
         for zone in config.zones.values():
 
@@ -238,7 +239,7 @@ class App:
         logging.debug("Rendering %s" % file)
         r = self.get_template(file).render(config=config)
         self.storage.write_file(file, r, True)
-        self.storage.set_permissions(file, config.secured_permissions.standard_flags)
+        self.storage.set_permissions(file, config.secured_permissions.shell_flags)
 
         for archive in self.archives.values():
             archive.make_tar()

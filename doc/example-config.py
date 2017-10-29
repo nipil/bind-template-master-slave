@@ -9,6 +9,7 @@ config = {
         "bind-group": "bind",
         "secured_flags": "640",
         "standard_flags": "664",
+        "shell_flags": "775",
     },
     "master": {
         "fqdn": "ns1.example.com",
