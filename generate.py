@@ -237,7 +237,7 @@ class App:
 
         file = "install.sh"
         logging.debug("Rendering %s" % file)
-        r = self.get_template(file).render(config=config)
+        r = self.get_template(file).render(config=config, build_dir=self.storage.base_dir)
         self.storage.write_file(file, r, True)
         self.storage.set_permissions(file, config.secured_permissions.shell_flags)
 
