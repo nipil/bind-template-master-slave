@@ -251,11 +251,11 @@ if __name__ == '__main__':
         parser.add_argument("-d", "--destination", metavar="DST", default="build")
         parser.add_argument("-t", "--templates", metavar="DIR", default="templates")
         parser.add_argument("-f", "--force", action="store_true")
-        parser.add_argument("-l", "--log-level", metavar="LVL", choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"], default="WARNING")
+        parser.add_argument("-l", "--log-level", metavar="LVL", choices=["critical", "error", "warning", "info", "debug"], default="warning")
         args = parser.parse_args()
 
         # configure logging
-        numeric_level = getattr(logging, args.log_level)
+        numeric_level = getattr(logging, args.log_level.upper())
         logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=numeric_level)
         logging.debug("Command line arguments: %s" % args)
 
