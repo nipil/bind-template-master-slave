@@ -240,6 +240,9 @@ class App:
         self.storage.write_file(file, r, True)
         self.storage.set_permissions(file, config.secured_permissions.standard_flags)
 
+        for archive in self.archives.values():
+            archive.make_tar()
+
 if __name__ == '__main__':
     try:
         # analyze commande line arguments
