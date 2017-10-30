@@ -177,27 +177,30 @@ class App:
         return self.template_lookup.get_template(name)
 
     def save(self, archive, inner_directory, file_name, content, perms, overwrite):
-        self.archives[archive].store("{0}/{1}".format(inner_directory, file_name), content, perms, overwrite or self.force_overwrite)
+        if isinstance(archive, str):
+            self.archives[archive].store("{0}/{1}".format(inner_directory, file_name), content, perms, overwrite or self.force_overwrite)
+        elif isinstance(archive, list):
+            for arch in archive:
+                self.archives[arch].store("{0}/{1}".format(inner_directory, file_name), content, perms, overwrite or self.force_overwrite)
+        else:
+            raise TypeError("Argument 'archive' of must be either a string or a list of string")
 
     def run(self, config):
 
         file = "named.conf"
         logging.debug("Rendering {0}".format(file))
         r = self.get_template(file).render(config=config)
-        self.save("master-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
-        self.save("slave-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
+        self.save(["master-conf", "slave-conf"], config.path.config, file, r, config.secured_permissions.standard_flags, True)
 
         file = "named.conf.options"
         logging.debug("Rendering {0}".format(file))
         r = self.get_template(file).render(config=config)
-        self.save("master-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
-        self.save("slave-conf", config.path.config, file, r, config.secured_permissions.standard_flags, True)
+        self.save(["master-conf", "slave-conf"], config.path.config, file, r, config.secured_permissions.standard_flags, True)
 
         file = "auth-master-slave.key"
         logging.debug("Rendering (auth) key '{0}'".format(file))
         r = self.get_template("key").render(key=RandomKey("master-slave"))
-        self.save("master-conf", config.path.config, file, r, config.secured_permissions.secured_flags, False)
-        self.save("slave-conf", config.path.config, file, r, config.secured_permissions.secured_flags, False)
+        self.save(["master-conf", "slave-conf"], config.path.config, file, r, config.secured_permissions.secured_flags, False)
 
         file = "named.conf.local.master"
         logging.debug("Rendering {0}".format(file))
@@ -212,8 +215,7 @@ class App:
         file = "secure_permissions.sh"
         logging.debug("Rendering {0}".format(file))
         r = self.get_template(file).render(config=config)
-        self.save("master-conf", config.path.config, file, r, config.secured_permissions.shell_flags, True)
-        self.save("slave-conf", config.path.config, file, r, config.secured_permissions.shell_flags, True)
+        self.save(["master-conf", "slave-conf"], config.path.config, file, r, config.secured_permissions.shell_flags, True)
 
         file = "ensure_dnssec_keys.sh"
         logging.debug("Rendering {0}".format(file))
