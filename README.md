@@ -32,6 +32,8 @@ Options:
     -d destination : folder where all the generated files will be placed
     -t templates : folder where the templates are located
     -f : overwrite key files and zone files
+    --overwrite-keys : will overwrite key files (which are preserved by default)
+    --overwrite-zones : will overwrite zone files (which are preserved by default)
 
 # Remote install
 

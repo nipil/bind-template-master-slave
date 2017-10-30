@@ -159,9 +159,10 @@ class RandomKey:
 
 class App:
 
-    def __init__(self, storage, template_directory, force_overwrite):
+    def __init__(self, storage, template_directory, overwrite_keys, overwrite_zones):
         self.storage = storage
-        self.force_overwrite = force_overwrite
+        self.overwrite_keys = overwrite_keys
+        self.overwrite_zones = overwrite_zones
 
         self.template_lookup = mako.lookup.TemplateLookup(directories=[template_directory])
 
@@ -178,10 +179,10 @@ class App:
 
     def save(self, archive, inner_directory, file_name, content, perms, overwrite):
         if isinstance(archive, str):
-            self.archives[archive].store("{0}/{1}".format(inner_directory, file_name), content, perms, overwrite or self.force_overwrite)
+            self.archives[archive].store("{0}/{1}".format(inner_directory, file_name), content, perms, overwrite)
         elif isinstance(archive, list):
             for arch in archive:
-                self.archives[arch].store("{0}/{1}".format(inner_directory, file_name), content, perms, overwrite or self.force_overwrite)
+                self.archives[arch].store("{0}/{1}".format(inner_directory, file_name), content, perms, overwrite)
         else:
             raise TypeError("Argument 'archive' of must be either a string or a list of string")
 
@@ -200,7 +201,7 @@ class App:
         file = "auth-master-slave.key"
         logging.debug("Rendering (auth) key '{0}'".format(file))
         r = self.get_template("key").render(key=RandomKey("master-slave"))
-        self.save(["master-conf", "slave-conf"], config.path.config, file, r, config.secured_permissions.secured_flags, False)
+        self.save(["master-conf", "slave-conf"], config.path.config, file, r, config.secured_permissions.secured_flags, self.overwrite_keys)
 
         file = "named.conf.local.master"
         logging.debug("Rendering {0}".format(file))
@@ -227,7 +228,7 @@ class App:
             file = "zone_file"
             logging.debug("Rendering {0} for {1}".format(file, zone.name))
             r = self.get_template(file).render(config=config, zone=zone)
-            self.save("master-zones", config.path.data, "db.{0}".format(zone.name), r, config.secured_permissions.standard_flags, False)
+            self.save("master-zones", config.path.data, "db.{0}".format(zone.name), r, config.secured_permissions.standard_flags, self.overwrite_zones)
 
             for d_u in zone.dynamic_updates.values():
 
@@ -235,7 +236,7 @@ class App:
                 file = "nsupdate-keys/{0}/{1}.key".format(zone.name, n)
                 logging.debug("Rendering (dynamic-update) key {0}".format(n))
                 r = self.get_template("key").render(key=RandomKey(n))
-                self.save("master-conf", config.path.config, file, r, config.secured_permissions.secured_flags, False)
+                self.save("master-conf", config.path.config, file, r, config.secured_permissions.secured_flags, self.overwrite_keys)
 
         file = "install.sh"
         logging.debug("Rendering {0}".format(file))
@@ -249,12 +250,13 @@ class App:
 if __name__ == '__main__':
     try:
         # analyze commande line arguments
-        parser = argparse.ArgumentParser()
+        parser = argparse.ArgumentParser(description="Bind9 configuration generator")
         parser.add_argument("-c", "--config-file", metavar="CFG", default="config.py")
-        parser.add_argument("-d", "--destination", metavar="DST", default="build")
-        parser.add_argument("-t", "--templates", metavar="DIR", default="templates")
-        parser.add_argument("-f", "--force", action="store_true")
+        parser.add_argument("-d", "--destination", metavar="DST_DIR", default="build")
+        parser.add_argument("-t", "--templates", metavar="SRC_DIR", default="templates")
         parser.add_argument("-l", "--log-level", metavar="LVL", choices=["critical", "error", "warning", "info", "debug"], default="warning")
+        parser.add_argument("--overwrite-keys", action="store_true")
+        parser.add_argument("--overwrite-zones", action="store_true")
         args = parser.parse_args()
 
         # configure logging
@@ -262,16 +264,12 @@ if __name__ == '__main__':
         logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=numeric_level)
         logging.debug("Command line arguments: {0}".format(args))
 
-        # enable overwriting keys and zones
-        if args.force:
-            logging.info("Forced mode activated, keys will be overwritten")
-
         # setup environment
         cfg = Configuration(args.config_file)
         storage = Storage(args.destination)
 
         # work
-        app = App(storage, args.templates, args.force)
+        app = App(storage, args.templates, args.overwrite_keys, args.overwrite_zones)
         app.run(cfg)
 
     except Exception as e:
