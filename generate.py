@@ -254,9 +254,9 @@ if __name__ == '__main__':
     try:
         # analyze commande line arguments
         parser = argparse.ArgumentParser(description="Bind9 configuration generator")
-        parser.add_argument("-c", "--config-file", metavar="CFG", default="config.py")
-        parser.add_argument("-d", "--destination", metavar="DST_DIR", default="build")
-        parser.add_argument("-t", "--templates", metavar="SRC_DIR", default="templates")
+        parser.add_argument("config", metavar="CONFIG", help="Configuration file (python file)")
+        parser.add_argument("-d", "--destination", metavar="DIR", default="build")
+        parser.add_argument("-t", "--templates", metavar="DIR", default="templates")
         parser.add_argument("-l", "--log-level", metavar="LVL", choices=["critical", "error", "warning", "info", "debug"], default="warning")
         parser.add_argument("--overwrite-keys", action="store_true")
         parser.add_argument("--overwrite-zones", action="store_true")
@@ -268,7 +268,7 @@ if __name__ == '__main__':
         logging.debug("Command line arguments: {0}".format(args))
 
         # setup environment
-        cfg = Configuration(args.config_file)
+        cfg = Configuration(args.config)
         storage = Storage(args.destination)
 
         # work

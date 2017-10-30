@@ -23,12 +23,13 @@ Edit the first part of `generate.py` to fit your needs
 Run :
 
     . venv/bin/activate
-    ./generate.py
+    ./generate.py config.py
+
+Where `config.py` (or any other name) is a python script holding the desired configuration (see `doc/example-config.py` for the required structure)
 
 Options:
 
     -l level : specify logging level (default=warning)
-    -c config.py : use specified configuration files
     -d destination : folder where all the generated files will be placed
     -t templates : folder where the templates are located
     -f : overwrite key files and zone files
