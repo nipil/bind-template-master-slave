@@ -178,13 +178,16 @@ class App:
         return self.template_lookup.get_template(name)
 
     def save(self, archive, inner_directory, file_name, content, perms, overwrite):
+
         if isinstance(archive, str):
-            self.archives[archive].store("{0}/{1}".format(inner_directory, file_name), content, perms, overwrite)
-        elif isinstance(archive, list):
-            for arch in archive:
-                self.archives[arch].store("{0}/{1}".format(inner_directory, file_name), content, perms, overwrite)
-        else:
+            archive = [ archive ]
+
+        if not isinstance(archive, list):
             raise TypeError("Argument 'archive' of must be either a string or a list of string")
+
+        path = "{0}/{1}".format(inner_directory, file_name)
+        for arch in archive:
+            self.archives[arch].store(path, content, perms, overwrite)
 
     def run(self, config):
 
