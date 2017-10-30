@@ -26,9 +26,11 @@ fi
 
 if [[ "$1" == "master" ]]
 then
-    set +e
-    tar -x -f /tmp/$1-zones.tar.gz -C / --keep-old-files
-    set -e
+    for z in $(tar -t -f /tmp/$1-zones.tar.gz)
+    do
+        [ ! -e /$z ] || { echo "Skipping $z zone file as it exists"; continue; }
+        tar -x -v -f /tmp/$1-zones.tar.gz -C / $z
+    done
 fi
 
 if [[ "$1" == "master" || "$1" == "slave" ]]
